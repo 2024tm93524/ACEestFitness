@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}{{ client['name'] }}{% endblock %}
+
+{% block content %}
+<h2 style="color:#d4af37; margin-bottom:20px;">👤 {{ client['name'] }}</h2>
+
+<div style="display:flex; gap:20px; flex-wrap:wrap;">
+
+  <!-- Left: Client profile -->
+  <div class="card" style="flex:1; min-width:260px;">
+    <h2>Profile</h2>
+    <table>
+      <tr><td style="color:#aaa;">Age</td><td>{{ client['age'] or '—' }}</td></tr>
+      <tr><td style="color:#aaa;">Height</td><td>{{ client['height'] or '—' }} cm</td></tr>
+      <tr><td style="color:#aaa;">Weight</td><td>{{ client['weight'] or '—' }} kg</td></tr>
+      <tr><td style="color:#aaa;">Program</td><td>{{ client['program'] or '—' }}</td></tr>
+      <tr><td style="color:#aaa;">Calories/day</td><td>{{ client['calories'] or '—' }} kcal</td></tr>
+      <tr><td style="color:#aaa;">Membership</td><td>
+        <span class="badge {% if client['membership_status'] == 'Active' %}badge-green{% else %}badge-red{% endif %}">
+          {{ client['membership_status'] }}
+        </span>
+      </td></tr>
+      <tr><td style="color:#aaa;">Target Weight</td><td>{{ client['target_weight'] or '—' }} kg</td></tr>
+    </table>
+  </div>
+
+  <!-- Right: Program details -->
+  {% if program_info %}
+  <div class="card" style="flex:2; min-width:300px;">
+    <h2>Training & Nutrition Plan</h2>
+    <p style="color:#d4af37; font-weight:bold; margin-bottom:8px;">Weekly Workout</p>
+    <pre style="background:#111; padding:12px; border-radius:5px; color:#eee; white-space:pre-wrap; font-family:monospace; font-size:13px;">{{ program_info.workout }}</pre>
+    <p style="color:#d4af37; font-weight:bold; margin-top:16px; margin-bottom:8px;">Daily Nutrition</p>
+    <pre style="background:#111; padding:12px; border-radius:5px; color:#eee; white-space:pre-wrap; font-family:monospace; font-size:13px;">{{ program_info.diet }}</pre>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Save Progress -->
+<div class="card">
+  <h2>📈 Log Weekly Adherence</h2>
+  <form method="POST" action="{{ url_for('save_progress') }}" style="display:flex; align-items:flex-end; gap:16px; flex-wrap:wrap;">
+    <input type="hidden" name="client_name" value="{{ client['name'] }}">
+    <div>
+      <label>Adherence % (0–100)</label>
+      <input type="number" name="adherence" min="0" max="100" value="80" style="width:120px;">
+    </div>
+    <button type="submit" class="btn btn-gold">Save Progress</button>
+  </form>
+
+  {% if progress %}
+  <table style="margin-top:16px;">
+    <tr><th>Week</th><th>Adherence %</th></tr>
+    {% for p in progress %}
+    <tr>
+      <td>{{ p['week'] }}</td>
+      <td>{{ p['adherence'] }}%</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+</div>
+
+<!-- Workouts -->
+<div class="card">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+    <h2>🏋️ Workout History</h2>
+    <a href="{{ url_for('add_workout') }}" class="btn btn-gold" style="font-size:13px;">+ Log Workout</a>
+  </div>
+
+  {% if workouts %}
+  <table>
+    <tr><th>Date</th><th>Type</th><th>Duration</th><th>Notes</th></tr>
+    {% for w in workouts %}
+    <tr>
+      <td>{{ w['date'] }}</td>
+      <td>{{ w['workout_type'] }}</td>
+      <td>{{ w['duration_min'] }} min</td>
+      <td>{{ w['notes'] or '—' }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p style="color:#666;">No workouts logged yet.</p>
+  {% endif %}
+</div>
+
+<div style="margin-top:8px;">
+  <a href="{{ url_for('clients') }}" class="btn btn-gray">← Back to Clients</a>
+</div>
+{% endblock %}

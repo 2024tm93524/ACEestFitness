@@ -18,6 +18,14 @@ aceest-devops/
 ├── app.py                        ← Main Flask application (all routes & business logic)
 ├── requirements.txt              ← Python dependencies
 ├── README.md                     ← This file
+├── templates/
+│   ├── base.html                 ← Shared HTML layout
+│   ├── login.html                ← Login page
+│   ├── dashboard.html            ← Main dashboard
+│   ├── clients.html              ← Client listing
+│   ├── add_client.html           ← Add/update client form
+│   ├── client_detail.html        ← Individual client page
+│   └── add_workout.html          ← Log workout form
 ├── tests/
 │   └── test_app.py               ← Pytest test suite (30+ tests)
 ```

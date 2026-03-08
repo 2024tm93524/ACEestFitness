@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<h2 style="color:#d4af37; margin-bottom:20px;">📊 Dashboard</h2>
+
+<div class="stat-row" style="margin-bottom:24px;">
+  <div class="stat-box">
+    <div class="num">{{ total_clients }}</div>
+    <div class="lbl">Total Clients</div>
+  </div>
+  <div class="stat-box">
+    <div class="num">{{ active_clients }}</div>
+    <div class="lbl">Active Members</div>
+  </div>
+  <div class="stat-box">
+    <div class="num">{{ programs|length }}</div>
+    <div class="lbl">Fitness Programs</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>🏃 Fitness Programs Available</h2>
+  <table>
+    <tr><th>Program</th><th>Calorie Factor</th><th>Diet Focus</th></tr>
+    {% for name, info in programs.items() %}
+    <tr>
+      <td><strong>{{ name }}</strong></td>
+      <td>{{ info.calorie_factor }} kcal/kg</td>
+      <td>{{ info.diet.split('\n')[0] }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<div class="card">
+  <h2>⚡ Recent Workouts</h2>
+  {% if recent_workouts %}
+  <table>
+    <tr><th>Client</th><th>Date</th><th>Type</th><th>Duration</th></tr>
+    {% for w in recent_workouts %}
+    <tr>
+      <td>{{ w['client_name'] }}</td>
+      <td>{{ w['date'] }}</td>
+      <td>{{ w['workout_type'] }}</td>
+      <td>{{ w['duration_min'] }} min</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p style="color:#666;">No workouts logged yet. <a href="{{ url_for('add_workout') }}" style="color:#d4af37;">Log first workout →</a></p>
+  {% endif %}
+</div>
+
+<div style="margin-top:16px;">
+  <a href="{{ url_for('add_client') }}" class="btn btn-gold">+ Add Client</a>
+  <a href="{{ url_for('clients') }}" class="btn btn-gray" style="margin-left:10px;">View All Clients</a>
+</div>
+{% endblock %}

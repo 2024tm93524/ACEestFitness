@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Add Client{% endblock %}
+
+{% block content %}
+<h2 style="color:#d4af37; margin-bottom:20px;">➕ Add / Update Client</h2>
+
+<div class="card" style="max-width:600px;">
+  <form method="POST" action="{{ url_for('add_client') }}">
+    <label>Full Name *</label>
+    <input type="text" name="name" required placeholder="e.g. Ravi Kumar">
+
+    <label>Age</label>
+    <input type="number" name="age" min="5" max="100" placeholder="28">
+
+    <label>Height (cm)</label>
+    <input type="number" name="height" step="0.1" placeholder="175">
+
+    <label>Weight (kg)</label>
+    <input type="number" name="weight" step="0.1" placeholder="75">
+
+    <label>Fitness Program *</label>
+    <select name="program" required>
+      <option value="">-- Select Program --</option>
+      {% for prog_name in programs %}
+      <option value="{{ prog_name }}">{{ prog_name }} ({{ programs[prog_name].calorie_factor }} kcal/kg)</option>
+      {% endfor %}
+    </select>
+
+    <label>Target Weight (kg)</label>
+    <input type="number" name="target_weight" step="0.1" placeholder="70">
+
+    <label>Membership Status</label>
+    <select name="membership_status">
+      <option value="Active">Active</option>
+      <option value="Inactive">Inactive</option>
+      <option value="Expired">Expired</option>
+    </select>
+
+    <div style="margin-top:20px; display:flex; gap:10px;">
+      <button type="submit" class="btn btn-gold">Save Client</button>
+      <a href="{{ url_for('clients') }}" class="btn btn-gray">Cancel</a>
+    </div>
+  </form>
+</div>
+
+<div class="card" style="max-width:600px;">
+  <h2>📋 Program Guide</h2>
+  {% for prog_name, info in programs.items() %}
+  <div style="margin-bottom:16px; padding-bottom:16px; border-bottom:1px solid #333;">
+    <strong style="color:#d4af37;">{{ prog_name }}</strong>
+    <p style="font-size:13px; color:#aaa; margin-top:4px; white-space:pre-line;">{{ info.workout[:120] }}...</p>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Log Workout{% endblock %}
+
+{% block content %}
+<h2 style="color:#d4af37; margin-bottom:20px;">🏋️ Log a Workout Session</h2>
+
+<div class="card" style="max-width:600px;">
+  <form method="POST" action="{{ url_for('add_workout') }}">
+    <label>Client *</label>
+    <select name="client_name" required>
+      <option value="">-- Select Client --</option>
+      {% for c in clients %}
+      <option value="{{ c['name'] }}">{{ c['name'] }}</option>
+      {% endfor %}
+    </select>
+
+    <label>Date</label>
+    <input type="date" name="date" required>
+
+    <label>Workout Type *</label>
+    <select name="workout_type" required>
+      <option value="">-- Select Type --</option>
+      <option value="Strength">Strength</option>
+      <option value="Hypertrophy">Hypertrophy</option>
+      <option value="Conditioning">Conditioning</option>
+      <option value="Mobility">Mobility</option>
+      <option value="Mixed">Mixed</option>
+    </select>
+
+    <label>Duration (minutes)</label>
+    <input type="number" name="duration_min" value="60" min="5" max="300">
+
+    <label>Notes</label>
+    <textarea name="notes" rows="3" placeholder="e.g. PR on squat today, felt strong..."></textarea>
+
+    <div style="margin-top:20px; display:flex; gap:10px;">
+      <button type="submit" class="btn btn-gold">Save Workout</button>
+      <a href="{{ url_for('dashboard') }}" class="btn btn-gray">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

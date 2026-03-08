@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Clients{% endblock %}
+
+{% block content %}
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+  <h2 style="color:#d4af37;">👥 All Clients</h2>
+  <a href="{{ url_for('add_client') }}" class="btn btn-gold">+ Add Client</a>
+</div>
+
+<div class="card">
+  {% if clients %}
+  <table>
+    <tr>
+      <th>Name</th><th>Age</th><th>Weight</th><th>Program</th>
+      <th>Calories/day</th><th>Membership</th><th>Action</th>
+    </tr>
+    {% for c in clients %}
+    <tr>
+      <td><strong>{{ c['name'] }}</strong></td>
+      <td>{{ c['age'] or '—' }}</td>
+      <td>{{ c['weight'] or '—' }} kg</td>
+      <td>{{ c['program'] or '—' }}</td>
+      <td>{{ c['calories'] or '—' }}</td>
+      <td>
+        <span class="badge {% if c['membership_status'] == 'Active' %}badge-green{% else %}badge-red{% endif %}">
+          {{ c['membership_status'] }}
+        </span>
+      </td>
+      <td><a href="{{ url_for('client_detail', name=c['name']) }}" style="color:#d4af37;">View →</a></td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p style="color:#666;">No clients yet. <a href="{{ url_for('add_client') }}" style="color:#d4af37;">Add your first client →</a></p>
+  {% endif %}
+</div>
+{% endblock %}
