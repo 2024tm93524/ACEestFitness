@@ -18,6 +18,8 @@ aceest-devops/
 ├── app.py                        ← Main Flask application (all routes & business logic)
 ├── requirements.txt              ← Python dependencies
 ├── README.md                     ← This file
+├── tests/
+│   └── test_app.py               ← Pytest test suite (30+ tests)
 ```
 
 ---
