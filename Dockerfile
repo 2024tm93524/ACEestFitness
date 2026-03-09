@@ -27,4 +27,5 @@ ENV FLASK_ENV=production
 ENV DB_PATH=/app/aceest_fitness.db
 
 # Initialize database and start the Flask app
-CMD ["sh", "-c", "python -c 'from app import init_db; init_db()' && python app.py"]
+#CMD ["sh", "-c", "python -c 'from app import init_db; init_db()' && python app.py"]
+CMD ["python", "-c", "import sys; print('App crashed on startup!'); sys.exit(1)"]
