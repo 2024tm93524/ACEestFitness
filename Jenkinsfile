@@ -17,21 +17,8 @@ pipeline {
 
         stage('Setup Python Environment') {
             steps {
-                echo '=== Installing Python and dependencies ==='
+                echo '=== Setting up Python virtual environment ==='
                 sh '''
-                    # Detect package manager and install Python
-                    if command -v dnf &>/dev/null; then
-                        sudo dnf install -y python3 python3-pip
-                    elif command -v yum &>/dev/null; then
-                        sudo yum install -y python3 python3-pip
-                    elif command -v apt-get &>/dev/null; then
-                        sudo apt-get update -y -qq
-                        sudo apt-get install -y python3 python3-pip python3-venv -qq
-                    else
-                        echo "No supported package manager found!"
-                        exit 1
-                    fi
-
                     python3 -m venv venv
                     . venv/bin/activate
                     pip install --upgrade pip -q
