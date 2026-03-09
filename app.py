@@ -9,6 +9,8 @@ from datetime import datetime, date
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 
+raise RuntimeError("Simulated bad deploy - triggering rollback!")  # BAD COMMIT
+
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "aceest-devops-secret-2025")
 
