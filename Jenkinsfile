@@ -55,7 +55,6 @@ pipeline {
             steps {
                 echo "=== Building Docker image: ${IMAGE_NAME}:${BUILD_TAG} ==="
                 sh '''
-                    # Build with both a version tag AND latest tag
                     docker build -t ${IMAGE_NAME}:${BUILD_TAG} -t ${IMAGE_NAME}:latest .
                     echo "=== Images built and tagged ==="
                     docker images | grep ${IMAGE_NAME}
@@ -67,11 +66,9 @@ pipeline {
             steps {
                 echo '=== Stopping old container and deploying latest ==='
                 sh '''
-                    # Stop and remove existing container if running
                     docker stop aceest-app 2>/dev/null || true
                     docker rm aceest-app 2>/dev/null || true
 
-                    # Run the newly built image
                     docker run -d \
                         --name aceest-app \
                         -p 5000:5000 \
@@ -88,28 +85,26 @@ pipeline {
                 echo '=== Verifying deployment health ==='
                 sh '''
                     sleep 3
-                    # Check if container is still running
                     if docker ps | grep -q aceest-app; then
-                        echo "✅ Deployment SUCCESS - container is healthy"
+                        echo "Deployment SUCCESS - container is healthy"
                         docker ps | grep aceest-app
                     else
-                        echo "❌ Container crashed - triggering rollback..."
+                        echo "Container crashed - triggering rollback..."
 
-                        # Find previous image (second most recent)
                         PREV_TAG=$(docker images ${IMAGE_NAME} \
-                            --format "{{.Tag}}" | grep "^v1\." | sed -n 2p)
+                            --format "{{.Tag}}" | grep "^v1\\." | sed -n 2p)
 
                         if [ -n "$PREV_TAG" ]; then
-                            echo "🔄 Rolling back to ${IMAGE_NAME}:${PREV_TAG}"
+                            echo "Rolling back to ${IMAGE_NAME}:${PREV_TAG}"
                             docker stop aceest-app 2>/dev/null || true
                             docker rm aceest-app 2>/dev/null || true
                             docker run -d \
                                 --name aceest-app \
                                 -p 5000:5000 \
                                 ${IMAGE_NAME}:${PREV_TAG}
-                            echo "✅ Rollback complete - running ${PREV_TAG}"
+                            echo "Rollback complete - running ${PREV_TAG}"
                         else
-                            echo "❌ No previous image found for rollback"
+                            echo "No previous image found for rollback"
                             exit 1
                         fi
                     fi
@@ -120,10 +115,10 @@ pipeline {
 
     post {
         success {
-            echo "✅ BUILD SUCCESSFUL – Deployed ${IMAGE_NAME}:${BUILD_TAG}"
+            echo "BUILD SUCCESSFUL - Deployed ${IMAGE_NAME}:${BUILD_TAG}"
         }
         failure {
-            echo "❌ BUILD FAILED – Check the logs above for errors."
+            echo "BUILD FAILED - Check the logs above for errors."
         }
         always {
             echo '=== Pipeline finished ==='
