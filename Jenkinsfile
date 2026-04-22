@@ -54,7 +54,7 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 echo '=== Running SonarQube static analysis ==='
-                withSonarQubeEnv('SonarQube') {
+                withSonarQubeEnv('aceest_fitness_sonarreport') {
                     sh '''
                         . venv/bin/activate
                         sonar-scanner \
