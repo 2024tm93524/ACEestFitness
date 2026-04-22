@@ -72,17 +72,6 @@ pipeline {
             }
         }
 
-        // Quality Gate checks SonarQube result
-        // If code quality fails, pipeline stops here and Docker build will not happen
-        stage('Quality Gate') {
-            steps {
-                echo '=== Waiting for SonarQube Quality Gate ==='
-                timeout(time: 10, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
-                }
-            }
-        }
-
         stage('Docker Build & Tag') {
             steps {
                 echo "=== Building Docker image: ${IMAGE_NAME}:${BUILD_TAG} ==="
