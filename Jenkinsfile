@@ -52,12 +52,17 @@ pipeline {
         // SonarQube scans the source code for bugs, vulnerabilities, and code quality issues
         // This runs before Docker build so only quality-approved code is deployed
         stage('SonarQube Analysis') {
+            environment {
+                // This pulls the scanner using the Name field from your screenshot
+                SCANNER_HOME = tool 'aceest_fitness_sonarreport' 
+            }
             steps {
                 echo '=== Running SonarQube static analysis ==='
                 withSonarQubeEnv('aceest_fitness_sonarreport') {
                     sh '''
                         . venv/bin/activate
-                        sonar-scanner \
+                        
+                        $SCANNER_HOME/bin/sonar-scanner \
                           -Dsonar.projectKey=aceest-fitness \
                           -Dsonar.sources=. \
                           -Dsonar.python.version=3 \
