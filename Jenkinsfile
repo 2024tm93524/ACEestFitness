@@ -8,6 +8,51 @@ pipeline {
 
     stages {
 
+        // ── Auto-install system tools ────────────────────────────────
+        // Runs at START of every build.
+        // Ensures Python, Docker and kubectl always available
+        // even after Jenkins container restart.
+        stage('Install System Dependencies') {
+            steps {
+                echo '=== Installing system tools (if missing) ==='
+                sh '''
+                    if ! command -v python3 &> /dev/null; then
+                        echo "Installing Python3..."
+                        apt-get update -y -qq
+                        apt-get install -y python3 python3-pip python3-venv -qq
+                    else
+                        echo "Python3 already installed: $(python3 --version)"
+                    fi
+
+                    if ! command -v docker &> /dev/null; then
+                        echo "Installing Docker CLI..."
+                        apt-get update -y -qq
+                        apt-get install -y docker.io -qq
+                    else
+                        echo "Docker already installed: $(docker --version)"
+                    fi
+
+                    if ! command -v kubectl &> /dev/null; then
+                        echo "Installing kubectl..."
+                        curl -LO "https://dl.k8s.io/release/v1.36.0/bin/linux/amd64/kubectl" -s
+                        install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+                        rm kubectl
+                    else
+                        echo "kubectl already installed"
+                    fi
+
+                    mkdir -p /root/.kube
+                    if [ -f /var/jenkins_home/.kube/config ]; then
+                        cp /var/jenkins_home/.kube/config /root/.kube/config
+                        sed -i "s|https://kubernetes.docker.internal:6443|https://192.168.65.3:6443|g" /root/.kube/config
+                        sed -i "s|https://127.0.0.1:6443|https://192.168.65.3:6443|g" /root/.kube/config
+                        sed -i "s|https://192.168.65.254:6443|https://192.168.65.3:6443|g" /root/.kube/config
+                        echo "kubeconfig ready"
+                    fi
+                '''
+            }
+        }
+
         stage('Checkout') {
             steps {
                 echo '=== Pulling latest code from GitHub ==='
@@ -49,10 +94,6 @@ pipeline {
             }
         }
 
-        // SonarQube static code analysis
-        // Results visible at http://localhost:9000
-        // Quality Gate "Failed" on dashboard = code has smells/bugs
-        // but pipeline continues — proves SonarQube is integrated
         stage('SonarQube Analysis') {
             environment {
                 SCANNER_HOME = tool 'aceest_fitness_sonarreport'
@@ -83,8 +124,6 @@ pipeline {
             }
         }
 
-        // Pytest runs INSIDE the Docker container
-        // Proves the container itself works end-to-end
         stage('Test Inside Container') {
             steps {
                 echo '=== Running Pytest INSIDE Docker container ==='
@@ -152,46 +191,22 @@ pipeline {
             }
         }
 
-        // Kubernetes Rolling Update deployment
-        // Other strategies (blue-green, canary etc) are shown
-        // manually via kubectl for demonstration
         stage('Kubernetes Deploy') {
             steps {
                 echo '=== Deploying to Kubernetes (Docker Desktop) ==='
                 sh '''
-                    # Fix kubeconfig location every build
-                    # (in case Jenkins restarted and lost the config)
-                    mkdir -p /root/.kube
-                    if [ -f /var/jenkins_home/.kube/config ]; then
-                        cp /var/jenkins_home/.kube/config /root/.kube/config
-                        # Fix server IP to match Kubernetes certificate
-                        sed -i "s|https://kubernetes.docker.internal:6443|https://192.168.65.3:6443|g" /root/.kube/config
-                        sed -i "s|https://127.0.0.1:6443|https://192.168.65.3:6443|g" /root/.kube/config
-                        sed -i "s|https://192.168.65.254:6443|https://192.168.65.3:6443|g" /root/.kube/config
-                    fi
-
-                    # Check kubectl works
                     if ! command -v kubectl &> /dev/null; then
                         echo "=== kubectl not found - skipping ==="
                         exit 0
                     fi
-
-                    # Check cluster is reachable
                     if ! kubectl cluster-info &> /dev/null; then
                         echo "=== Kubernetes not reachable - skipping ==="
                         exit 0
                     fi
-
-                    # Apply Rolling Update deployment
                     kubectl apply -f k8s/deployment.yaml
-
-                    # Wait for rollout
                     kubectl rollout status deployment/aceest-fitness --timeout=60s
-
-                    # Show results
                     echo "=== Kubernetes pods ==="
                     kubectl get pods -l app=aceest-fitness
-
                     echo "=== Kubernetes service ==="
                     kubectl get service aceest-service
                 '''
