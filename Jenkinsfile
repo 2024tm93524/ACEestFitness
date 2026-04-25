@@ -16,7 +16,7 @@ pipeline {
             steps {
                 echo '=== Installing system tools (if missing) ==='
                 sh '''
-                    if ! command -v python3 &> /dev/null; then
+                    if ! command -v python3 > /dev/null 2>&1; then
                         echo "Installing Python3..."
                         apt-get update -y -qq
                         apt-get install -y python3 python3-pip python3-venv -qq
@@ -24,7 +24,7 @@ pipeline {
                         echo "Python3 already installed: $(python3 --version)"
                     fi
 
-                    if ! command -v docker &> /dev/null; then
+                    if ! command -v docker > /dev/null 2>&1; then
                         echo "Installing Docker CLI..."
                         apt-get update -y -qq
                         apt-get install -y docker.io -qq
@@ -32,7 +32,7 @@ pipeline {
                         echo "Docker already installed: $(docker --version)"
                     fi
 
-                    if ! command -v kubectl &> /dev/null; then
+                    if ! command -v kubectl > /dev/null 2>&1; then
                         echo "Installing kubectl..."
                         curl -LO "https://dl.k8s.io/release/v1.36.0/bin/linux/amd64/kubectl" -s
                         install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
@@ -195,11 +195,11 @@ pipeline {
             steps {
                 echo '=== Deploying to Kubernetes (Docker Desktop) ==='
                 sh '''
-                    if ! command -v kubectl &> /dev/null; then
+                    if ! command -v kubectl > /dev/null 2>&1; then
                         echo "=== kubectl not found - skipping ==="
                         exit 0
                     fi
-                    if ! kubectl cluster-info &> /dev/null; then
+                    if ! kubectl cluster-info > /dev/null 2>&1; then
                         echo "=== Kubernetes not reachable - skipping ==="
                         exit 0
                     fi
