@@ -49,19 +49,19 @@ pipeline {
             }
         }
 
-        // SonarQube scans the source code for bugs, vulnerabilities, and code quality issues
-        // This runs before Docker build so only quality-approved code is deployed
+        // SonarQube static code analysis
+        // Results visible at http://localhost:9000
+        // Quality Gate "Failed" on dashboard = code has smells/bugs
+        // but pipeline continues — proves SonarQube is integrated
         stage('SonarQube Analysis') {
             environment {
-                // This pulls the scanner using the Name field from your screenshot
-                SCANNER_HOME = tool 'aceest_fitness_sonarreport' 
+                SCANNER_HOME = tool 'aceest_fitness_sonarreport'
             }
             steps {
                 echo '=== Running SonarQube static analysis ==='
                 withSonarQubeEnv('aceest_fitness_sonarreport') {
                     sh '''
                         . venv/bin/activate
-                        
                         $SCANNER_HOME/bin/sonar-scanner \
                           -Dsonar.projectKey=aceest-fitness \
                           -Dsonar.sources=. \
@@ -83,10 +83,8 @@ pipeline {
             }
         }
 
-        // ── Pytest INSIDE the Docker container ──────────────────────
-        // Assignment requires: "Execute Pytest inside containerized environment"
-        // This runs tests using the BUILT IMAGE, not the local venv
-        // Proves the container itself works correctly end-to-end
+        // Pytest runs INSIDE the Docker container
+        // Proves the container itself works end-to-end
         stage('Test Inside Container') {
             steps {
                 echo '=== Running Pytest INSIDE Docker container ==='
@@ -98,7 +96,6 @@ pipeline {
                 '''
             }
         }
-        // ────────────────────────────────────────────────────────────
 
         stage('Deploy Latest Image') {
             steps {
@@ -106,21 +103,16 @@ pipeline {
                 sh '''
                     docker stop aceest-app 2>/dev/null || true
                     docker rm aceest-app 2>/dev/null || true
-
-                    # Kill ANY other container holding port 5000
                     CONFLICT=$(docker ps --filter "publish=5000" --format "{{.ID}}")
                     if [ -n "$CONFLICT" ]; then
-                        echo "Found container occupying port 5000 — stopping it..."
                         echo "$CONFLICT" | xargs docker stop
                         echo "$CONFLICT" | xargs docker rm 2>/dev/null || true
                     fi
-
                     docker run -d \
                         --name aceest-app \
                         -p 5000:5000 \
                         --restart unless-stopped \
                         ${IMAGE_NAME}:latest
-
                     echo "=== App deployed at http://localhost:5000 ==="
                     docker ps | grep aceest-app
                 '''
@@ -137,21 +129,17 @@ pipeline {
                         docker ps | grep aceest-app
                     else
                         echo "Container crashed - triggering rollback..."
-
                         PREV_TAG=$(docker images ${IMAGE_NAME} \
                             --format "{{.Tag}}" \
                             | grep "^v1\\." \
                             | grep -v "^${BUILD_TAG}$" \
                             | sort -t. -k2 -rn \
                             | head -1)
-
                         if [ -n "$PREV_TAG" ]; then
                             echo "Rolling back to ${IMAGE_NAME}:${PREV_TAG}"
                             docker stop aceest-app 2>/dev/null || true
-                            docker rm   aceest-app 2>/dev/null || true
-                            docker run -d \
-                                --name aceest-app \
-                                -p 5000:5000 \
+                            docker rm aceest-app 2>/dev/null || true
+                            docker run -d --name aceest-app -p 5000:5000 \
                                 --restart unless-stopped \
                                 ${IMAGE_NAME}:${PREV_TAG}
                             echo "Rollback complete - running ${PREV_TAG}"
@@ -164,36 +152,44 @@ pipeline {
             }
         }
 
-        // ── Kubernetes Deployment (Rolling Update) ──────────────────
-        // Deploys to Docker Desktop's built-in Kubernetes cluster
-        // Uses Rolling Update strategy by default (pods replaced 1 by 1)
-        // All other strategies (blue-green, canary etc) are applied
-        // manually via kubectl for demonstration purposes
+        // Kubernetes Rolling Update deployment
+        // Other strategies (blue-green, canary etc) are shown
+        // manually via kubectl for demonstration
         stage('Kubernetes Deploy') {
             steps {
                 echo '=== Deploying to Kubernetes (Docker Desktop) ==='
                 sh '''
-                    # Check kubectl is available
+                    # Fix kubeconfig location every build
+                    # (in case Jenkins restarted and lost the config)
+                    mkdir -p /root/.kube
+                    if [ -f /var/jenkins_home/.kube/config ]; then
+                        cp /var/jenkins_home/.kube/config /root/.kube/config
+                        # Fix server IP to match Kubernetes certificate
+                        sed -i "s|https://kubernetes.docker.internal:6443|https://192.168.65.3:6443|g" /root/.kube/config
+                        sed -i "s|https://127.0.0.1:6443|https://192.168.65.3:6443|g" /root/.kube/config
+                        sed -i "s|https://192.168.65.254:6443|https://192.168.65.3:6443|g" /root/.kube/config
+                    fi
+
+                    # Check kubectl works
                     if ! command -v kubectl &> /dev/null; then
-                        echo "=== kubectl not found - skipping K8s deploy ==="
+                        echo "=== kubectl not found - skipping ==="
                         exit 0
                     fi
 
-                    # Check Kubernetes cluster is reachable
+                    # Check cluster is reachable
                     if ! kubectl cluster-info &> /dev/null; then
-                        echo "=== Kubernetes not running ==="
-                        echo "=== Enable it: Docker Desktop → Settings → Kubernetes ==="
+                        echo "=== Kubernetes not reachable - skipping ==="
                         exit 0
                     fi
 
-                    # Apply the main deployment (Rolling Update strategy)
+                    # Apply Rolling Update deployment
                     kubectl apply -f k8s/deployment.yaml
 
-                    # Wait for rollout to complete
+                    # Wait for rollout
                     kubectl rollout status deployment/aceest-fitness --timeout=60s
 
-                    # Show running pods and service
-                    echo "=== Running Kubernetes pods ==="
+                    # Show results
+                    echo "=== Kubernetes pods ==="
                     kubectl get pods -l app=aceest-fitness
 
                     echo "=== Kubernetes service ==="
@@ -201,7 +197,6 @@ pipeline {
                 '''
             }
         }
-        // ────────────────────────────────────────────────────────────
     }
 
     post {
