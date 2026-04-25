@@ -1,0 +1,85 @@
+# ═══════════════════════════════════════════════════════════════════
+# MAIN DEPLOYMENT + ROLLING UPDATE (DEFAULT STRATEGY)
+# ═══════════════════════════════════════════════════════════════════
+#
+# WHAT IS ROLLING UPDATE? (layman explanation)
+#   Kubernetes replaces pods ONE BY ONE with the new version.
+#   At no point are ALL pods down — always some serving users.
+#   This is the DEFAULT strategy — happens automatically.
+#
+# HOW TO TEST IT (for your screenshots):
+#   Step 1: kubectl apply -f k8s/deployment.yaml
+#   Step 2: kubectl get pods   (see 2 pods running)
+#   Step 3: kubectl rollout status deployment/aceest-fitness
+#   Step 4: Screenshot showing pods running
+#   Step 5: To simulate update → just run Jenkins Build Now
+#           Jenkins rebuilds image → kubectl apply runs again
+#           → watch pods replaced one by one
+#   Step 6: To rollback: kubectl rollout undo deployment/aceest-fitness
+# ═══════════════════════════════════════════════════════════════════
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aceest-fitness
+  labels:
+    app: aceest-fitness
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1              # max pods DOWN at same time
+      maxSurge: 1                    # max EXTRA pods created during update
+  selector:
+    matchLabels:
+      app: aceest-fitness
+  template:
+    metadata:
+      labels:
+        app: aceest-fitness
+    spec:
+      containers:
+      - name: aceest-fitness
+        image: aceest-fitness:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 5000
+        env:
+        - name: FLASK_ENV
+          value: "production"
+        - name: DB_PATH
+          value: "/app/aceest_fitness.db"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aceest-service
+spec:
+  selector:
+    app: aceest-fitness
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 5000
+    nodePort: 30080
+  type: NodePort

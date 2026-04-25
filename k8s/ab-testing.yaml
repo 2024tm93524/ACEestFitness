@@ -1,0 +1,150 @@
+# ═══════════════════════════════════════════════════════════════════
+# A/B TESTING DEPLOYMENT
+# ═══════════════════════════════════════════════════════════════════
+#
+# WHAT IS IT? (layman explanation)
+#   You have TWO versions of your app running at the same time.
+#   Version A = original (the control group)
+#   Version B = new feature/UI change (the test group)
+#   Users are split 50/50 between them.
+#   You measure which version gets better results.
+#   Then you keep the winner and delete the loser.
+#
+# REAL WORLD EXAMPLE:
+#   Version A: Login button is BLUE
+#   Version B: Login button is GREEN
+#   50% of users see blue, 50% see green.
+#   Green gets 30% more clicks → green wins → delete blue.
+#
+# DIFFERENCE FROM CANARY:
+#   Canary  = gradually rolling out ONE new version to test stability
+#   A/B     = running TWO different versions to compare which is BETTER
+#
+# HOW TO TEST IT (for your screenshots):
+#   Step 1: kubectl apply -f k8s/ab-testing.yaml
+#   Step 2: kubectl get pods   (see version-a and version-b pods)
+#   Step 3: kubectl port-forward svc/aceest-version-a-service 8081:80
+#           Open http://localhost:8081  (Version A)
+#   Step 4: kubectl port-forward svc/aceest-version-b-service 8082:80
+#           Open http://localhost:8082  (Version B)
+#   Step 5: Screenshot both browser tabs showing both versions running
+#   Step 6: "Version B wins" → scale up B, delete A:
+#           kubectl scale deployment aceest-version-b --replicas=4
+#           kubectl delete deployment aceest-version-a
+#
+# ═══════════════════════════════════════════════════════════════════
+
+# ── Version A: Original (control group) ───────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aceest-version-a
+  labels:
+    app: aceest-fitness
+    version: "A"
+spec:
+  replicas: 2                        # 2 pods for version A
+  selector:
+    matchLabels:
+      app: aceest-fitness
+      version: "A"
+  template:
+    metadata:
+      labels:
+        app: aceest-fitness
+        version: "A"
+    spec:
+      containers:
+      - name: aceest-fitness
+        image: aceest-fitness:latest  # original version
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 5000
+        env:
+        - name: FLASK_ENV
+          value: "production"
+        - name: DB_PATH
+          value: "/app/aceest_fitness.db"
+        - name: APP_VERSION           # helps identify which version is running
+          value: "A"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+
+---
+# ── Version B: New feature/change (test group) ────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aceest-version-b
+  labels:
+    app: aceest-fitness
+    version: "B"
+spec:
+  replicas: 2                        # 2 pods for version B (equal split)
+  selector:
+    matchLabels:
+      app: aceest-fitness
+      version: "B"
+  template:
+    metadata:
+      labels:
+        app: aceest-fitness
+        version: "B"
+    spec:
+      containers:
+      - name: aceest-fitness
+        image: aceest-fitness:latest  # new version with changes
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 5000
+        env:
+        - name: FLASK_ENV
+          value: "production"
+        - name: DB_PATH
+          value: "/app/aceest_fitness.db"
+        - name: APP_VERSION           # helps identify which version is running
+          value: "B"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+
+---
+# ── Service A: Routes traffic only to Version A pods ──────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: aceest-version-a-service
+spec:
+  selector:
+    app: aceest-fitness
+    version: "A"                     # ONLY version A pods
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 5000
+    nodePort: 30085
+  type: NodePort
+
+---
+# ── Service B: Routes traffic only to Version B pods ──────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: aceest-version-b-service
+spec:
+  selector:
+    app: aceest-fitness
+    version: "B"                     # ONLY version B pods
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 5000
+    nodePort: 30086
+  type: NodePort

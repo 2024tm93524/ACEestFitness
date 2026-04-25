@@ -1,0 +1,144 @@
+# ═══════════════════════════════════════════════════════════════════
+# SHADOW DEPLOYMENT
+# ═══════════════════════════════════════════════════════════════════
+#
+# WHAT IS IT? (layman explanation)
+#   Your live app serves real users normally (production).
+#   Kubernetes ALSO sends a silent copy of every request to
+#   the "shadow" version running in parallel.
+#   Shadow processes the request but its response is THROWN AWAY.
+#   Users NEVER see the shadow response — it is completely invisible.
+#
+# REAL WORLD EXAMPLE:
+#   You are upgrading your database. You want to test the new
+#   database handles all real queries without errors.
+#   Shadow gets all the same queries silently.
+#   If shadow crashes → nobody notices, production still runs fine.
+#   If shadow works fine → you are confident to switch production.
+#
+# DIFFERENCE FROM CANARY:
+#   Canary  = real users actually get new version responses (20%)
+#   Shadow  = new version gets requests but responses are discarded
+#             users NEVER get shadow responses
+#
+# HOW TO TEST IT (for your screenshots):
+#   Step 1: kubectl apply -f k8s/shadow.yaml
+#   Step 2: kubectl get pods   (see both production + shadow pods)
+#   Step 3: Open app at localhost:5000 (production serving normally)
+#   Step 4: kubectl logs -l track=shadow  (see shadow also got requests)
+#   Step 5: Screenshot showing both pods running simultaneously
+#
+# ═══════════════════════════════════════════════════════════════════
+
+# ── Production: Real users see this ───────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aceest-production
+  labels:
+    app: aceest-fitness
+    track: production
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: aceest-fitness
+      track: production
+  template:
+    metadata:
+      labels:
+        app: aceest-fitness
+        track: production
+    spec:
+      containers:
+      - name: aceest-fitness
+        image: aceest-fitness:latest
+        imagePullPolicy: Never       # use local Docker image
+        ports:
+        - containerPort: 5000
+        env:
+        - name: FLASK_ENV
+          value: "production"
+        - name: DB_PATH
+          value: "/app/aceest_fitness.db"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+
+---
+# ── Shadow: Gets copy of traffic, responses discarded ─────────────
+# In a full setup, a service mesh (like Istio) mirrors traffic here.
+# For this assignment, we demonstrate shadow runs alongside production.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aceest-shadow
+  labels:
+    app: aceest-fitness
+    track: shadow
+spec:
+  replicas: 1                        # shadow needs only 1 replica
+  selector:
+    matchLabels:
+      app: aceest-fitness
+      track: shadow
+  template:
+    metadata:
+      labels:
+        app: aceest-fitness
+        track: shadow
+    spec:
+      containers:
+      - name: aceest-fitness
+        image: aceest-fitness:latest  # new version being tested silently
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 5000
+        env:
+        - name: FLASK_ENV
+          value: "shadow"             # marks this as shadow instance
+        - name: DB_PATH
+          value: "/app/shadow_fitness.db"  # separate DB so no data mixing
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+
+---
+# ── Production Service: Only routes to production pods ────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: aceest-production-service
+spec:
+  selector:
+    app: aceest-fitness
+    track: production                # ONLY production pods get user traffic
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 5000
+    nodePort: 30083
+  type: NodePort
+
+---
+# ── Shadow Service: Internal only, for traffic mirroring ──────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: aceest-shadow-service
+spec:
+  selector:
+    app: aceest-fitness
+    track: shadow                    # shadow pod accessible separately
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 5000
+    nodePort: 30084
+  type: NodePort

@@ -1,0 +1,118 @@
+# ═══════════════════════════════════════════════════════════════════
+# BLUE-GREEN DEPLOYMENT
+# ═══════════════════════════════════════════════════════════════════
+#
+# WHAT IS IT? (layman explanation)
+#   Two identical environments run simultaneously.
+#   BLUE  = current live version (users see this RIGHT NOW)
+#   GREEN = new version (prepared and tested, waiting)
+#   When ready: switch ALL users from blue to green in 1 second.
+#   If green breaks: switch ALL users back to blue in 1 second.
+#   Zero downtime. Instant rollback.
+#
+# HOW TO TEST IT (for your screenshots):
+#   Step 1: kubectl apply -f k8s/blue-green.yaml
+#   Step 2: kubectl get pods   (see both blue + green pods)
+#   Step 3: Open app (currently blue): 
+#           kubectl port-forward svc/aceest-bg-service 8083:80
+#           http://localhost:8083
+#   Step 4: Screenshot showing service pointing to blue
+#           kubectl describe service aceest-bg-service
+#   Step 5: Switch to green (simulate new release):
+#           kubectl patch service aceest-bg-service \
+#             -p "{\"spec\":{\"selector\":{\"slot\":\"green\"}}}"
+#   Step 6: Refresh browser — still works (now on green)
+#   Step 7: Screenshot of kubectl describe showing slot=green
+#   Step 8: Rollback to blue:
+#           kubectl patch service aceest-bg-service \
+#             -p "{\"spec\":{\"selector\":{\"slot\":\"blue\"}}}"
+#   Step 9: Screenshot showing rollback to blue
+# ═══════════════════════════════════════════════════════════════════
+
+# ── BLUE: Current live version ────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aceest-blue
+  labels:
+    app: aceest-fitness
+    slot: blue
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: aceest-fitness
+      slot: blue
+  template:
+    metadata:
+      labels:
+        app: aceest-fitness
+        slot: blue
+    spec:
+      containers:
+      - name: aceest-fitness
+        image: aceest-fitness:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 5000
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+
+---
+# ── GREEN: New version ready to go live ───────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aceest-green
+  labels:
+    app: aceest-fitness
+    slot: green
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: aceest-fitness
+      slot: green
+  template:
+    metadata:
+      labels:
+        app: aceest-fitness
+        slot: green
+    spec:
+      containers:
+      - name: aceest-fitness
+        image: aceest-fitness:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 5000
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+
+---
+# ── Service: The traffic switch ───────────────────────────────────
+# slot: blue  → users go to BLUE pods
+# slot: green → users go to GREEN pods
+# Switch with: kubectl patch service aceest-bg-service \
+#   -p "{\"spec\":{\"selector\":{\"slot\":\"green\"}}}"
+apiVersion: v1
+kind: Service
+metadata:
+  name: aceest-bg-service
+spec:
+  selector:
+    app: aceest-fitness
+    slot: blue                       # change to "green" to switch traffic
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 5000
+    nodePort: 30081
+  type: NodePort

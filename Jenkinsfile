@@ -83,6 +83,23 @@ pipeline {
             }
         }
 
+        // ── Pytest INSIDE the Docker container ──────────────────────
+        // Assignment requires: "Execute Pytest inside containerized environment"
+        // This runs tests using the BUILT IMAGE, not the local venv
+        // Proves the container itself works correctly end-to-end
+        stage('Test Inside Container') {
+            steps {
+                echo '=== Running Pytest INSIDE Docker container ==='
+                sh '''
+                    docker run --rm \
+                        -e DB_PATH=/tmp/test.db \
+                        ${IMAGE_NAME}:latest \
+                        sh -c "pip install pytest pytest-flask -q && pytest tests/ -v --tb=short"
+                '''
+            }
+        }
+        // ────────────────────────────────────────────────────────────
+
         stage('Deploy Latest Image') {
             steps {
                 echo '=== Stopping old container and deploying latest ==='
@@ -131,7 +148,7 @@ pipeline {
                         if [ -n "$PREV_TAG" ]; then
                             echo "Rolling back to ${IMAGE_NAME}:${PREV_TAG}"
                             docker stop aceest-app 2>/dev/null || true
-                            docker rm aceest-app 2>/dev/null || true
+                            docker rm   aceest-app 2>/dev/null || true
                             docker run -d \
                                 --name aceest-app \
                                 -p 5000:5000 \
@@ -146,6 +163,45 @@ pipeline {
                 '''
             }
         }
+
+        // ── Kubernetes Deployment (Rolling Update) ──────────────────
+        // Deploys to Docker Desktop's built-in Kubernetes cluster
+        // Uses Rolling Update strategy by default (pods replaced 1 by 1)
+        // All other strategies (blue-green, canary etc) are applied
+        // manually via kubectl for demonstration purposes
+        stage('Kubernetes Deploy') {
+            steps {
+                echo '=== Deploying to Kubernetes (Docker Desktop) ==='
+                sh '''
+                    # Check kubectl is available
+                    if ! command -v kubectl &> /dev/null; then
+                        echo "=== kubectl not found - skipping K8s deploy ==="
+                        exit 0
+                    fi
+
+                    # Check Kubernetes cluster is reachable
+                    if ! kubectl cluster-info &> /dev/null; then
+                        echo "=== Kubernetes not running ==="
+                        echo "=== Enable it: Docker Desktop → Settings → Kubernetes ==="
+                        exit 0
+                    fi
+
+                    # Apply the main deployment (Rolling Update strategy)
+                    kubectl apply -f k8s/deployment.yaml
+
+                    # Wait for rollout to complete
+                    kubectl rollout status deployment/aceest-fitness --timeout=60s
+
+                    # Show running pods and service
+                    echo "=== Running Kubernetes pods ==="
+                    kubectl get pods -l app=aceest-fitness
+
+                    echo "=== Kubernetes service ==="
+                    kubectl get service aceest-service
+                '''
+            }
+        }
+        // ────────────────────────────────────────────────────────────
     }
 
     post {
