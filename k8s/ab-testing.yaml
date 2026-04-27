@@ -56,8 +56,8 @@ spec:
     spec:
       containers:
       - name: aceest-fitness
-        image: aceest-fitness:latest  # original version
-        imagePullPolicy: Never
+        image: 2024tm93524/aceest-fitness:latest  # original version
+        imagePullPolicy: Always
         ports:
         - containerPort: 5000
         env:
@@ -97,8 +97,8 @@ spec:
     spec:
       containers:
       - name: aceest-fitness
-        image: aceest-fitness:latest  # new version with changes
-        imagePullPolicy: Never
+        image: 2024tm93524/aceest-fitness:latest  # new version with changes
+        imagePullPolicy: Always
         ports:
         - containerPort: 5000
         env:

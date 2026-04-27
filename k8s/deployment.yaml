@@ -40,8 +40,8 @@ spec:
     spec:
       containers:
       - name: aceest-fitness
-        image: aceest-fitness:latest
-        imagePullPolicy: Never
+        image: 2024tm93524/aceest-fitness:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 5000
         env:

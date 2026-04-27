@@ -38,6 +38,7 @@ spec:
       containers:
       - name: aceest-fitness
         image: 2024tm93524/aceest-fitness:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 5000
         readinessProbe:
@@ -79,6 +80,7 @@ spec:
       containers:
       - name: aceest-fitness
         image: 2024tm93524/aceest-fitness:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 5000
         env:
@@ -119,6 +121,7 @@ spec:
       containers:
       - name: aceest-fitness
         image: 2024tm93524/aceest-fitness:v1.1
+        imagePullPolicy: Always
         ports:
         - containerPort: 5000
 
@@ -146,5 +149,6 @@ spec:
       containers:
       - name: aceest-fitness
         image: 2024tm93524/aceest-fitness:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 5000

@@ -2,16 +2,12 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = "aceest-fitness"
+        IMAGE_NAME = "2024tm93524/aceest-fitness"
         BUILD_TAG  = "v1.${BUILD_NUMBER}"
     }
 
     stages {
 
-        // ── Auto-install system tools ────────────────────────────────
-        // Runs at START of every build.
-        // Ensures Python, Docker and kubectl always available
-        // even after Jenkins container restart.
         stage('Install System Dependencies') {
             steps {
                 echo '=== Installing system tools (if missing) ==='
@@ -113,13 +109,15 @@ pipeline {
             }
         }
 
-        stage('Docker Build & Tag') {
+        stage('Docker Build, Tag & Push') {
             steps {
-                echo "=== Building Docker image: ${IMAGE_NAME}:${BUILD_TAG} ==="
+                echo "=== Building and Pushing Docker image: ${IMAGE_NAME}:${BUILD_TAG} ==="
                 sh '''
                     docker build -t ${IMAGE_NAME}:${BUILD_TAG} -t ${IMAGE_NAME}:latest .
-                    echo "=== Images built and tagged ==="
-                    docker images | grep ${IMAGE_NAME}
+                    echo "=== Pushing to Docker Hub ==="
+                    docker push ${IMAGE_NAME}:${BUILD_TAG}
+                    docker push ${IMAGE_NAME}:latest
+                    echo "=== Images pushed successfully ==="
                 '''
             }
         }
@@ -212,78 +210,6 @@ pipeline {
                 '''
             }
         }
-
-        // ── Minikube Deploy stage ────────────────────────────────────
-        // This stage deploys the same image to Minikube cluster.
-        // Minikube has its OWN Docker registry separate from Windows.
-        // So we must:
-        //   1. Install minikube CLI inside Jenkins (if missing)
-        //   2. Load the built image INTO Minikube's Docker
-        //   3. Apply deployment to Minikube cluster
-        //
-        // This stage runs AFTER Docker Desktop K8s deploy above.
-        // Both clusters get the same image.
-        //
-        // If Minikube is not running → stage skips gracefully (exit 0)
-        // Start Minikube on Windows first: minikube start --driver=docker
-        stage('Minikube Deploy') {
-            steps {
-                echo '=== Deploying to Minikube ==='
-                sh '''
-                    # Install minikube CLI inside Jenkins if missing
-                    if ! command -v minikube > /dev/null 2>&1; then
-                        echo "Installing minikube CLI..."
-                        curl -Lo /usr/local/bin/minikube \
-                            https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64 -s
-                        chmod +x /usr/local/bin/minikube
-                        echo "minikube CLI installed"
-                    else
-                        echo "minikube already installed: $(minikube version --short)"
-                    fi
-
-                    # Switch kubectl context to minikube
-                    if kubectl config get-contexts minikube > /dev/null 2>&1; then
-                        kubectl config use-context minikube
-                        echo "Switched kubectl context to minikube"
-                    else
-                        echo "=== Minikube context not found - skipping ==="
-                        exit 0
-                    fi
-
-                    # Check Minikube cluster is reachable
-                    if ! kubectl cluster-info > /dev/null 2>&1; then
-                        echo "=== Minikube not running - skipping ==="
-                        echo "=== Start it with: minikube start --driver=docker ==="
-                        exit 0
-                    fi
-
-                    # Load the built image into Minikube's Docker
-                    # Minikube cannot see your Windows Docker images directly
-                    echo "=== Loading image into Minikube ==="
-                    minikube image load ${IMAGE_NAME}:latest
-                    echo "Image loaded successfully"
-
-                    # Apply Rolling Update deployment to Minikube
-                    kubectl apply -f k8s/deployment.yaml
-
-                    # Wait for rollout to complete
-                    kubectl rollout status deployment/aceest-fitness --timeout=60s
-
-                    # Show running pods in Minikube
-                    echo "=== Minikube pods ==="
-                    kubectl get pods -l app=aceest-fitness
-
-                    # Show service
-                    echo "=== Minikube service ==="
-                    kubectl get service aceest-service
-
-                    # Show the app URL via Minikube
-                    echo "=== App URL via Minikube ==="
-                    minikube service aceest-service --url 2>/dev/null || true
-                '''
-            }
-        }
-        // ────────────────────────────────────────────────────────────
     }
 
     post {
