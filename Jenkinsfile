@@ -10,7 +10,7 @@ pipeline {
 
         stage('Install System Dependencies') {
             steps {
-                echo '=== Checking system tools ==='
+                echo '=== Installing system tools (if missing) ==='
                 sh '''
                     if ! command -v python3 > /dev/null 2>&1; then
                         echo "Installing Python3..."
@@ -26,6 +26,24 @@ pipeline {
                         apt-get install -y docker.io -qq
                     else
                         echo "Docker already installed: $(docker --version)"
+                    fi
+
+                    if ! command -v kubectl > /dev/null 2>&1; then
+                        echo "Installing kubectl..."
+                        curl -LO "https://dl.k8s.io/release/v1.36.0/bin/linux/amd64/kubectl" -s
+                        install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+                        rm kubectl
+                    else
+                        echo "kubectl already installed"
+                    fi
+
+                    mkdir -p /root/.kube
+                    if [ -f /var/jenkins_home/.kube/config ]; then
+                        cp /var/jenkins_home/.kube/config /root/.kube/config
+                        sed -i "s|https://kubernetes.docker.internal:6443|https://192.168.65.3:6443|g" /root/.kube/config
+                        sed -i "s|https://127.0.0.1:6443|https://192.168.65.3:6443|g" /root/.kube/config
+                        sed -i "s|https://192.168.65.254:6443|https://192.168.65.3:6443|g" /root/.kube/config
+                        echo "kubeconfig ready"
                     fi
                 '''
             }
@@ -167,6 +185,28 @@ pipeline {
                             exit 1
                         fi
                     fi
+                '''
+            }
+        }
+
+        stage('Kubernetes Deploy') {
+            steps {
+                echo '=== Deploying to Kubernetes (Docker Desktop) ==='
+                sh '''
+                    if ! command -v kubectl > /dev/null 2>&1; then
+                        echo "=== kubectl not found - skipping ==="
+                        exit 0
+                    fi
+                    if ! kubectl cluster-info > /dev/null 2>&1; then
+                        echo "=== Kubernetes not reachable - skipping ==="
+                        exit 0
+                    fi
+                    kubectl apply -f k8s/deployment.yaml
+                    kubectl rollout status deployment/aceest-fitness --timeout=60s
+                    echo "=== Kubernetes pods ==="
+                    kubectl get pods -l app=aceest-fitness
+                    echo "=== Kubernetes service ==="
+                    kubectl get service aceest-service
                 '''
             }
         }
